@@ -429,7 +429,6 @@ Connects the retriever, prompt, and LLM to create the complete RAG application.
 
 ---
 
-# 🎤 Interview Explanation
 
 ### Explain this project:
 
