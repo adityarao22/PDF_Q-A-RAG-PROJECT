@@ -3,7 +3,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from embedding import get_embeddings
 # 1. Load PDF
-loader = PyPDFLoader("data/File-management.pdf")
+loader = PyPDFLoader("data/DIP.pdf")
 documents = loader.load()
 print(f"Total pages: {len(documents)}")
 # 2. Create chunks
