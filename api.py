@@ -20,7 +20,7 @@ app = FastAPI(
 
 # ---------------- LOAD MODELS ----------------
 
-embeddings = get_embeddings()
+
 llm = get_llm()
 
 
@@ -48,7 +48,7 @@ def health():
 async def upload_pdfs(
     files: List[UploadFile] = File(...)
 ):
-
+    embeddings = get_embeddings()
     os.makedirs("temp_pdfs", exist_ok=True)
 
     all_documents = []
@@ -108,6 +108,7 @@ async def upload_pdfs(
 
 @app.post("/ask")
 def ask_question(question: str):
+    embeddings = get_embeddings()
 
     # Load ChromaDB
 
