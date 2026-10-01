@@ -1,200 +1,214 @@
 import streamlit as st
-import os
-import shutil
-from langchain_community.document_loaders import PyPDFLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_chroma import Chroma
-from embedding import get_embeddings
-from prompt import prompt
-from llm import get_llm
+import requests
+
 
 st.set_page_config(
     page_title="PDF Q&A RAG Assistant",
     page_icon="🤖"
 )
+
 st.title("🤖 PDF Q&A RAG Assistant")
 
-# ---------------- LOAD MODELS ----------------
 
-@st.cache_resource
-def load_embeddings():
-    return get_embeddings()
+FASTAPI_URL = "http://127.0.0.1:8000"
 
-@st.cache_resource
-def load_llm():
-    return get_llm()
 
-embeddings = load_embeddings()
-llm = load_llm()
+# =====================================================
+# SIDEBAR
+# =====================================================
 
-# ---------------- CHAT HISTORY ----------------
-if "messages" not in st.session_state:
-    st.session_state.messages = []
-# ---------------- SIDEBAR ----------------
 with st.sidebar:
     st.header("📄 Upload PDFs")
+
     uploaded_files = st.file_uploader(
-        "Upload one or more PDF files",
+        "Upload PDF files",
         type=["pdf"],
         accept_multiple_files=True
     )
-    process_button = st.button("Process PDFs")
-    st.divider()
-    st.subheader("⚙️ Controls")
-    if st.button("🗑️ Clear Chat"):
-        st.session_state.messages = []
-        st.rerun()
 
-# ---------------- PROCESS PDFs ----------------
+    if st.button("Process PDFs"):
+        if uploaded_files:
+            files = [
+                (
+                    "files",
+                    (
+                        file.name,
+                        file.getvalue(),
+                        "application/pdf"
+                    )
+                )
+                for file in uploaded_files
+            ]
 
-if process_button and uploaded_files:
-    with st.spinner("Processing PDFs..."):
-        # Initialize document list
-        all_documents = []
-        # Create temporary folder
-        os.makedirs("temp_pdfs", exist_ok=True)
-        # Process uploaded PDFs
-        for uploaded_file in uploaded_files:
-            file_path = os.path.join(
-                "temp_pdfs",
-                uploaded_file.name
+            response = requests.post(
+                f"{FASTAPI_URL}/upload",
+                files=files
             )
-            # Save PDF
-            with open(file_path, "wb") as f:
-                f.write(uploaded_file.getbuffer())
-            # Load PDF
-            loader = PyPDFLoader(file_path)
-            documents = loader.load()
-            # Add documents
-            all_documents.extend(documents)
-        # Split documents
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=500,
-            chunk_overlap=50
-        )
-        chunks = text_splitter.split_documents(all_documents)
-        # Create vector database
-        vectorstore = Chroma.from_documents(
-            documents=chunks,
-            embedding=embeddings,
-            collection_name="rag_documents"
-        )
-        # Save vectorstore in memory
-        st.session_state.vectorstore = vectorstore
-        # Clear previous chat
-        st.session_state.messages = []
-        st.success(
-            f"✅ Successfully processed {len(uploaded_files)} PDF(s)!"
-        )
+
+            if response.status_code == 200:
+                data = response.json()
+                st.success(
+                    f"✅ Processed {data['chunks']} chunks"
+                )
+            else:
+                st.error(
+                    f"❌ Upload failed: {response.text}"
+                )
+        else:
+            st.warning("Please select a PDF first.")
 
 
-def get_retriever():
-    if "vectorstore" not in st.session_state:
-        return None
-    return st.session_state.vectorstore.as_retriever(
-        search_kwargs={"k": 3}
-    )
+# =====================================================
+# CHAT HISTORY
+# =====================================================
 
-def format_docs(docs):
-    return "\n\n".join(
-        doc.page_content for doc in docs
-    )
+if "messages" not in st.session_state:
 
-def extract_text(content):
-    # If response is already a string
-    if isinstance(content, str):
-        return content
-    # If response is a list of blocks
-    if isinstance(content, list):
-        texts = []
-        for item in content:
-            if isinstance(item, dict):
-                if item.get("type") == "text":
-                    texts.append(item.get("text", ""))
-            # Handle object-based content blocks
-            elif hasattr(item, "text"):
-                texts.append(item.text)
-        return "".join(texts)
-    return str(content)
+    st.session_state.messages = []
 
-def ask_question(question):
-    retriever = get_retriever()
-    if retriever is None:
-        return "⚠️ Please upload and process PDF files first.", []
-    # Retrieve relevant documents
-    docs = retriever.invoke(question)
-    # Create context
-    context = format_docs(docs)
-    # Get source pages
-    sources = []
-    for doc in docs:
-        page = doc.metadata.get("page", None)
-        source = doc.metadata.get("source", "Unknown")
-        if page is not None:
-            sources.append(
-                f"{os.path.basename(source)} - Page {page + 1}"
-            )
-    # Remove duplicates
-    sources = list(set(sources))
-    # Create chat history
-    chat_history = ""
-    for message in st.session_state.messages:
-        chat_history += (
-            f"{message['role']}: "
-            f"{message['content']}\n"
-        )
-    # Create prompt
-    messages = prompt.invoke({
-        "context": context,
-        "question": question,
-        "chat_history": chat_history
-    })
-
-    try:
-      response = llm.invoke(messages)
-      answer = extract_text(response.content)
-      return answer, sources
-    except Exception as e:  
-        error_message = str(e) 
-        if "429" in error_message or "RESOURCE_EXHAUSTED" in error_message:
-            return (
-                "⚠️ Gemini API rate limit reached. Please wait a few seconds and try again.",
-                []
-            )
-        return (
-            f"⚠️ Error while generating answer: {error_message}",
-            []
-        )
-
-# ---------------- DISPLAY CHAT HISTORY ----------------
 
 for message in st.session_state.messages:
-    with st.chat_message(message["role"]):
-        st.write(message["content"])
+
+    with st.chat_message(
+        message["role"]
+    ):
+
+        st.write(
+            message["content"]
+        )
 
 
-# ---------------- USER INPUT ----------------
+# =====================================================
+# ASK QUESTION
+# =====================================================
 
 question = st.chat_input(
     "Ask a question about your PDFs..."
 )
+
+
 if question:
+
+    # ---------------- USER ----------------
+
     with st.chat_message("user"):
+
         st.write(question)
-    st.session_state.messages.append({
-        "role": "user",
-        "content": question
-    })
+
+    st.session_state.messages.append(
+        {
+            "role": "user",
+            "content": question
+        }
+    )
+
+
+    # ---------------- ASSISTANT ----------------
+
     with st.chat_message("assistant"):
-        with st.spinner("Searching PDFs..."):
-            answer, sources = ask_question(question)
+
+        with st.spinner(
+            "Searching PDFs..."
+        ):
+
+            try:
+
+                response = requests.post(
+                    f"{FASTAPI_URL}/ask",
+                    params={
+                        "question": question
+                    },
+                    timeout=120
+                )
+
+                # Check HTTP status
+                if response.status_code != 200:
+
+                    st.error(
+                        f"❌ FastAPI returned "
+                        f"status {response.status_code}"
+                    )
+
+                    st.code(response.text)
+
+                    answer = (
+                        "Unable to get an answer "
+                        "from the backend."
+                    )
+
+                else:
+
+                    # Convert response to JSON
+                    data = response.json()
+
+                    # Debug safety check
+                    if not isinstance(data, dict):
+
+                        st.error(
+                            "❌ FastAPI returned an "
+                            "unexpected response."
+                        )
+
+                        st.code(
+                            str(data)
+                        )
+
+                        answer = (
+                            "Invalid response from FastAPI."
+                        )
+
+                    elif "answer" not in data:
+
+                        st.error(
+                            "❌ 'answer' field is missing "
+                            "from FastAPI response."
+                        )
+
+                        st.json(data)
+
+                        answer = (
+                            "FastAPI did not return an answer."
+                        )
+
+                    else:
+
+                        answer = data["answer"]
+
+            except requests.exceptions.ConnectionError:
+
+                answer = (
+                    "⚠️ Cannot connect to FastAPI. "
+                    "Please make sure FastAPI is running."
+                )
+
+            except requests.exceptions.Timeout:
+
+                answer = (
+                    "⚠️ FastAPI request timed out. "
+                    "Please try again."
+                )
+
+            except requests.exceptions.JSONDecodeError:
+
+                answer = (
+                    "⚠️ FastAPI returned an invalid response."
+                )
+
+                st.code(response.text)
+
+            except Exception as e:
+
+                answer = f"⚠️ Error: {str(e)}"
+
+
         st.write(answer)
-        if sources:
-            st.caption(
-                "📄 Sources: " +
-                " | ".join(sources)
-            )
-    st.session_state.messages.append({
-        "role": "assistant",
-        "content": answer
-    })
+
+
+    # Save assistant message
+
+    st.session_state.messages.append(
+        {
+            "role": "assistant",
+            "content": answer
+        }
+    )

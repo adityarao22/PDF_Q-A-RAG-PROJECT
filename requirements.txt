@@ -1,4 +1,9 @@
 streamlit
+fastapi
+uvicorn
+python-multipart
+python-dotenv
+
 langchain
 langchain-community
 langchain-chroma
