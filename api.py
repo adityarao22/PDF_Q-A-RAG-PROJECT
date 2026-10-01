@@ -50,27 +50,20 @@ async def upload_pdfs(
 ):
     embeddings = get_embeddings()
     os.makedirs("temp_pdfs", exist_ok=True)
-
     all_documents = []
-
     for file in files:
-
         file_path = os.path.join(
             "temp_pdfs",
             file.filename
         )
-
         with open(file_path, "wb") as buffer:
 
             shutil.copyfileobj(
                 file.file,
                 buffer
             )
-
         loader = PyPDFLoader(file_path)
-
         documents = loader.load()
-
         all_documents.extend(documents)
 
 
@@ -170,16 +163,12 @@ Answer:
 
 
     # Gemini
-
     response = llm.invoke(
         prompt
     )
 
-
     # Get answer
-
     answer = response.content
-
 
     # Handle string response
 
@@ -189,21 +178,13 @@ Answer:
 
 
     # Handle list response
-
     elif isinstance(answer, list):
-
         final_answer = ""
-
         for item in answer:
-
             if isinstance(item, dict):
-
                 if item.get("text"):
-
                     final_answer += item["text"]
-
             elif hasattr(item, "text"):
-
                 final_answer += item.text
 
 

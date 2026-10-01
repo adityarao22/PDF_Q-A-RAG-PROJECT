@@ -1,1 +1,0 @@
-invalid type: string "➡\n \n12\n \n \n🔸\n \nRAND()\n \nSELECT\n \nRAND();\n \n \n➡\n \nRandom\n \nnumber\n \nbetween\n \n0\n \nand\n \n1\n \n \n🔹\n \n5\n\u{20e3}\n \nMin\n \n/\n \nMax\n \n(Mathematical)\n \n🔸\n \nGREATEST()\n \nSELECT\n \nGREATEST(10,\n \n20,\n \n5);\n \n \n➡\n \n20\n \n \n🔸\n \nLEAST()\n \nSELECT\n \nLEAST(10,\n \n20,\n \n5);\n \n \n➡\n \n5", expected a boolea

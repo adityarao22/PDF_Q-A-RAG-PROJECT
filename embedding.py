@@ -1,5 +1,5 @@
-from langchain_huggingface import HuggingFaceEmbeddings
+
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+
 def get_embeddings():
-    return HuggingFaceEmbeddings(
-        model_name="sentence-transformers/all-MiniLM-L6-v2"
-    )
+    return GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
