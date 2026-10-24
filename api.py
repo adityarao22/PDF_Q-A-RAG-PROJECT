@@ -23,6 +23,18 @@ app = FastAPI(
 
 llm = get_llm()
 
+from fastapi.responses import HTMLResponse
+
+@app.get("/", response_class=HTMLResponse)
+def home():
+    return """
+    <html>
+      <head>
+       <meta name="hmw-verify" content="d7e30c8fd08a4c77dbf00a510bbe5604">
+      </head>
+      <body>PDF Q&A RAG API is running</body>
+    </html>
+    """
 
 # ---------------- HOME ----------------
 
